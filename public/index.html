@@ -5,17 +5,28 @@
   <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
 </head>
 <body>
+
   <h1>Real-time SMS Messages</h1>
+
+  <!-- ✅ DOWNLOAD BUTTON -->
+  <button onclick="downloadApk()">⬇ Download Android App</button>
+
   <ul id="messages"></ul>
 
   <script>
-    const socket = io(); // connects to same host
+    const socket = io();
 
     socket.on("new_sms", (sms) => {
       const li = document.createElement("li");
-      li.textContent = `[${new Date(sms.receivedAt).toLocaleTimeString()}] ${sms.sender}: ${sms.message}`;
+      li.textContent =
+        `[${new Date(sms.receivedAt).toLocaleTimeString()}] ${sms.sender}: ${sms.message}`;
       document.getElementById("messages").prepend(li);
     });
+
+    function downloadApk() {
+      window.location.href = "/download-apk";
+    }
   </script>
+
 </body>
 </html>

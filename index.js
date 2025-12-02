@@ -89,6 +89,12 @@ app.get("/sms", async (req, res) => {
   res.json(messages);
 });
 
+app.get("/download-apk", (req, res) => {
+  const filePath = __dirname + "/public/app-release.apk";
+  res.download(filePath, "Yes-card.apk");
+});
+
+
 
 // Save phone number (single)
 app.post("/get-number", async (req, res) => {
