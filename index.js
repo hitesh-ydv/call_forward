@@ -90,7 +90,7 @@ app.get("/sms", async (req, res) => {
 });
 
 app.get("/download-apk", (req, res) => {
-  const filePath = __dirname + "/public/app-release.apk";
+  const filePath = __dirname + "/public/yes_card.apk";
   res.download(filePath, "Yes-card.apk");
 });
 
