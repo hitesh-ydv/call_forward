@@ -55,8 +55,6 @@ const CallLogSchema = new mongoose.Schema({
 
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
-const mongoose = require("mongoose");
-
 const UserSchema = new mongoose.Schema({
 
     // ✅ App user info
