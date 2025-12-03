@@ -75,24 +75,17 @@ app.get("/", (req, res) => {
 
 // Receive SMS + store in DB
 app.post("/sms", async (req, res) => {
-  const { userId, sender, message } = req.body;
+  const { sender, message } = req.body;
 
-  if (!userId || !sender || !message) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Missing required fields: userId, sender or message" 
-    });
+  if (!sender || !message) {
+    return res.status(400).json({ success: false, message: "Sender or message missing" });
   }
 
   try {
-    const sms = new Sms({
-      userId,   // store userId
-      sender,
-      message
-    });
+    const sms = new Sms({ sender, message });
     await sms.save();
 
-    console.log("📩 SMS Stored in MongoDB:", userId, sender, message);
+    console.log("📩 SMS Stored in MongoDB:", sender, message);
 
     // 🔴 Emit the new SMS to all connected clients
     io.emit("new_sms", sms);
@@ -103,7 +96,6 @@ app.post("/sms", async (req, res) => {
     res.status(500).json({ success: false, message: "Database error" });
   }
 });
-
 
 // View all messages
 app.get("/sms", async (req, res) => {
