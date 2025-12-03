@@ -27,7 +27,6 @@ mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1
    SMS SCHEMA
 ======================= */
 const SmsSchema = new mongoose.Schema({
-  serId: { type: String, required: true }, // NEW: link to user,
   sender: { type: String, required: true },
   message: { type: String, required: true },
   receivedAt: { type: Date, default: Date.now }
