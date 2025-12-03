@@ -43,15 +43,17 @@ const PhoneSchema = new mongoose.Schema({
 const Phone = mongoose.model("Phone", PhoneSchema);
 
 const CallLogSchema = new mongoose.Schema({
-  phone: { type: String },        // device phone number (optional)
+  userId: { type: String, required: true }, // NEW: link to user
+  phone: { type: String },                  // device phone number (optional)
   number: { type: String, required: true }, // called / received number
   type: { type: String, enum: ["INCOMING", "OUTGOING", "MISSED"], required: true },
   duration: { type: String },
-  date: { type: Number, required: true }, // timestamp from android
+  date: { type: Number, required: true },   // timestamp from Android
   createdAt: { type: Date, default: Date.now }
 });
 
 const CallLog = mongoose.model("CallLog", CallLogSchema);
+
 
 
 /* =======================
@@ -160,24 +162,26 @@ app.get("/get-number", async (req, res) => {
    RECEIVE CALL LOG
 ======================= */
 app.post("/call-log", async (req, res) => {
+  const { userId, number, type, duration, date, phone } = req.body;
 
-  const { number, type, duration, date, phone } = req.body;
+  console.log("Received call log:", userId, number, type);
 
-  if (!number || !type || !date) {
+  if (!userId || !number || !type || !date) {
     return res.status(400).json({
       success: false,
-      message: "Missing required fields"
+      message: "Missing required fields (userId, number, type, date)"
     });
   }
 
   try {
-    // Avoid duplicates (same call timestamp + number)
-    const exists = await CallLog.findOne({ number, date });
+    // Avoid duplicates (same call timestamp + number + userId)
+    const exists = await CallLog.findOne({ userId, number, date });
     if (exists) {
       return res.json({ success: true, message: "Already exists" });
     }
 
     const log = new CallLog({
+      userId,
       phone: phone || null,
       number,
       type,
@@ -187,16 +191,16 @@ app.post("/call-log", async (req, res) => {
 
     await log.save();
 
-    console.log("📞 Call log saved:", number, type);
+    console.log("📞 Call log saved:", userId, number, type);
 
-    // 🔴 Emit to admin dashboard
+    // Emit to admin dashboard
     io.emit("new_call_log", log);
 
     res.json({ success: true });
 
   } catch (err) {
     console.error("❌ Call log save error:", err);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
