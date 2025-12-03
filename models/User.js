@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const UserSchema = new mongoose.Schema({
 
     // ✅ App user info
+    userId: { type: String, required: true }, // NEW: link to user
     name: {
         type: String,
         required: true,
