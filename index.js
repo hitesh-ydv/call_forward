@@ -8,6 +8,8 @@ const { Server } = require("socket.io");
 const app = express();
 const PORT = 3000;
 
+const User = require("./models/User");
+
 /* =======================
    HTTP SERVER & SOCKET.IO
 ======================= */
@@ -56,7 +58,24 @@ const CallLogSchema = new mongoose.Schema({
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
 
+app.post("/submit-form", async (req, res) => {
+    try {
+        const user = new User(req.body);
+        await user.save();
 
+        return res.status(201).json({
+            success: true,
+            message: "User data saved successfully"
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 /* =======================
    MIDDLEWARE
 ======================= */
