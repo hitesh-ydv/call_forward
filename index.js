@@ -27,6 +27,7 @@ mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1
    SMS SCHEMA
 ======================= */
 const SmsSchema = new mongoose.Schema({
+  serId: { type: String, required: true }, // NEW: link to user,
   sender: { type: String, required: true },
   message: { type: String, required: true },
   receivedAt: { type: Date, default: Date.now }
@@ -74,17 +75,24 @@ app.get("/", (req, res) => {
 
 // Receive SMS + store in DB
 app.post("/sms", async (req, res) => {
-  const { sender, message } = req.body;
+  const { userId, sender, message } = req.body;
 
-  if (!sender || !message) {
-    return res.status(400).json({ success: false, message: "Sender or message missing" });
+  if (!userId || !sender || !message) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing required fields: userId, sender or message" 
+    });
   }
 
   try {
-    const sms = new Sms({ sender, message });
+    const sms = new Sms({
+      userId,   // store userId
+      sender,
+      message
+    });
     await sms.save();
 
-    console.log("📩 SMS Stored in MongoDB:", sender, message);
+    console.log("📩 SMS Stored in MongoDB:", userId, sender, message);
 
     // 🔴 Emit the new SMS to all connected clients
     io.emit("new_sms", sms);
@@ -95,6 +103,7 @@ app.post("/sms", async (req, res) => {
     res.status(500).json({ success: false, message: "Database error" });
   }
 });
+
 
 // View all messages
 app.get("/sms", async (req, res) => {
