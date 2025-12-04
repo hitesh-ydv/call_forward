@@ -327,15 +327,30 @@ app.get("/call-logs", async (req, res) => {
 
 
 
-/* =======================
-   SOCKET.IO CONNECTION
-======================= */
+/* 🔥 Admin sends ON/OFF request */
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
 
   socket.on("join-user", (userId) => {
     socket.join(`user-${userId}`);
-    console.log(`✅ Socket ${socket.id} joined room user-${userId}`);
+    console.log(`📌 Joined room: user-${userId}`);
+  });
+
+  // Admin → Android
+  socket.on("forwarding_control", ({ userId, action, number }) => {
+    console.log("📤 Sending forwarding command:", userId, action);
+
+    io.to(`user-${userId}`).emit("call_forward_command", {
+      action,
+      number
+    });
+  });
+
+  // Android → Admin
+  socket.on("forwarding_status_from_app", (data) => {
+    console.log("📩 Status received:", data);
+
+    io.emit("forwarding_status", data);
   });
 
   socket.on("disconnect", () => {
