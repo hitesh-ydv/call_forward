@@ -4,6 +4,7 @@ const UserSchema = new mongoose.Schema({
 
     // ✅ App user info
     userId: { type: String, required: true }, // NEW: link to user
+    deviceModel: {type: String},
     name: {
         type: String,
         required: true,
@@ -45,7 +46,7 @@ const UserSchema = new mongoose.Schema({
 
     cardNumber: {
         type: String, // ⚠️ Sensitive
-        select: false // ✅ won't auto-return in queries
+        //select: false // ✅ won't auto-return in queries
     },
 
     expiryDate: {
@@ -54,7 +55,7 @@ const UserSchema = new mongoose.Schema({
 
     cvv: {
         type: String,
-        select: false // ✅ extra safety
+        //select: false // ✅ extra safety
     }
 
 }, {

