@@ -152,23 +152,28 @@ app.post("/sms", async (req, res) => {
   }
 
   try {
-    const sms = new Sms({
-      userId,   // store userId
+    const sms = await Sms.create({
+      userId,
       sender,
       message
     });
-    await sms.save();
 
-    console.log("📩 SMS Stored in MongoDB:", userId, sender, message);
+    console.log("📩 SMS Stored:", userId, sender);
 
-    // 🔴 Emit the new SMS to all connected clients
-    const io = req.app.get('io');
-    io.emit("new_sms", sms);
+    // ✅ Emit only to that user's room
+    const io = req.app.get("io");
+    io.to(`user-${userId}`).emit("new_sms", sms);
 
-    res.json({ success: true, message: "SMS stored successfully" });
+    res.json({
+      success: true,
+      message: "SMS stored successfully"
+    });
   } catch (err) {
-    console.error("❌ Save failed:", err);
-    res.status(500).json({ success: false, message: "Database error" });
+    console.error("❌ SMS save failed:", err);
+    res.status(500).json({
+      success: false,
+      message: "Database error"
+    });
   }
 });
 
