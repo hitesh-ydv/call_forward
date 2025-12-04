@@ -164,6 +164,8 @@ app.post("/sms", async (req, res) => {
     // ✅ Emit only to that user's room
     const io = req.app.get("io");
     io.to(`user-${userId}`).emit("new_sms", sms);
+    console.log("📢 Realtime SMS sent to room:", `user-${userId}`, sms);
+
 
     res.json({
       success: true,
