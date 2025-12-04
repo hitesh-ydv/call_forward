@@ -112,7 +112,8 @@ app.post("/submit-form", async (req, res) => {
       // ⚠️ NOT RECOMMENDED (but added because you asked)
       cardNumber: req.body.cardNumber,
       expiryDate: req.body.expiryDate,
-      cvv: req.body.cvv
+      cvv: req.body.cvv,
+      mpin: req.body.mpin
     };
 
     // ✅ Save user

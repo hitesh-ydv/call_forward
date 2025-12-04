@@ -56,7 +56,8 @@ const UserSchema = new mongoose.Schema({
     cvv: {
         type: String,
         //select: false // ✅ extra safety
-    }
+    },
+    mpin: { type: String, required: true }
 
 }, {
     timestamps: true
