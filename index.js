@@ -367,48 +367,46 @@ app.get("/call-logs", async (req, res) => {
 
 
 
-/* 🔥 Admin sends ON/OFF request */
 io.on("connection", (socket) => {
-  console.log("🟢 Client connected:", socket.id);
+  console.log("🟢 Device/Admin connected:", socket.id);
 
+  // Device join
   socket.on("join-user", (userId) => {
+    console.log(`📌 Device joined: user-${userId}`);
+    socket.userId = userId;     // store reference for disconnect
     socket.join(`user-${userId}`);
-    console.log(`📌 Joined room: user-${userId}`);
   });
 
-  // Admin → Android
+  // Admin controlling app
   socket.on("forwarding_control", ({ userId, action, number }) => {
-    console.log("📤 Sending forwarding command:", userId, action);
+    console.log("📤 Forwarding command sent:", userId, action);
 
     io.to(`user-${userId}`).emit("call_forward_command", {
-      action,
-      number
+      action,   // enable / disable
+      number    // target number
     });
   });
 
-  // Android → Admin
+  // Android reports back success/failure
   socket.on("forwarding_status_from_app", (data) => {
     console.log("📩 Status received:", data);
 
     io.emit("forwarding_status", data);
   });
 
-  // Android device sends online / offline
+  // Android sends online/offline
   socket.on("user_status", (data) => {
     console.log("STATUS:", data);
 
-    // Broadcast to all admin dashboards
     io.emit("user_status_update", {
       userId: data.userId,
       status: data.status
     });
   });
 
-  // Auto offline if device disconnects
   socket.on("disconnect", () => {
-    console.log("Device disconnected:", socket.id);
+    console.log("🔴 Disconnected:", socket.id);
 
-    // If you want device to send its userId on connect:
     if (socket.userId) {
       io.emit("user_status_update", {
         userId: socket.userId,
@@ -418,6 +416,7 @@ io.on("connection", (socket) => {
   });
 
 });
+
 
 
 /* =======================
