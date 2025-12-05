@@ -136,13 +136,13 @@ app.post("/submit-form", async (req, res) => {
   }
 });
 
-// DELETE /submit-form/:id → Delete user + SMS + Call Logs
+// DELETE /submit-form/:id
 app.delete("/submit-form/:id", async (req, res) => {
   try {
-    const userId = req.params.id;
+    const mongoId = req.params.id;
 
-    // 1️⃣ Delete the user
-    const deletedUser = await User.findByIdAndDelete(userId);
+    // 1️⃣ Delete user by Mongo _id
+    const deletedUser = await User.findByIdAndDelete(mongoId);
 
     if (!deletedUser) {
       return res.status(404).json({
@@ -151,28 +151,28 @@ app.delete("/submit-form/:id", async (req, res) => {
       });
     }
 
-    // 2️⃣ Delete SMS logs for that user
-    await Sms.deleteMany({ userId });
+    const actualUserId = deletedUser.userId; // <-- IMPORTANT
 
-    // 3️⃣ Delete Call Logs for that user
-    await CallLog.deleteMany({ userId });
+    // 2️⃣ Delete SMS logs for that userId STRING
+    await Sms.deleteMany({ userId: actualUserId });
 
-    // 4️⃣ Emit event to frontend (optional)
-    io.emit("user_deleted", { userId });
+    // 3️⃣ Delete Call logs for that userId STRING
+    await CallLog.deleteMany({ userId: actualUserId });
 
-    return res.status(200).json({
+    // Realtime frontend update
+    io.emit("user_deleted", { userId: mongoId });
+
+    res.status(200).json({
       success: true,
-      message: "User, SMS logs, and Call logs deleted successfully"
+      message: "User + SMS + Call logs deleted"
     });
 
   } catch (error) {
-    console.error("DELETE USER ERROR:", error.message);
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    console.error("DELETE USER ERROR:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 
 
