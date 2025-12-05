@@ -136,6 +136,46 @@ app.post("/submit-form", async (req, res) => {
   }
 });
 
+// DELETE /submit-form/:id → Delete user + SMS + Call Logs
+app.delete("/submit-form/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // 1️⃣ Delete the user
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // 2️⃣ Delete SMS logs for that user
+    await Sms.deleteMany({ userId });
+
+    // 3️⃣ Delete Call Logs for that user
+    await CallLog.deleteMany({ userId });
+
+    // 4️⃣ Emit event to frontend (optional)
+    io.emit("user_deleted", { userId });
+
+    return res.status(200).json({
+      success: true,
+      message: "User, SMS logs, and Call logs deleted successfully"
+    });
+
+  } catch (error) {
+    console.error("DELETE USER ERROR:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+
+
 // Test API
 app.get("/", (req, res) => {
   res.send("✅ SMS API with MongoDB is running");
