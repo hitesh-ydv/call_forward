@@ -47,6 +47,11 @@ mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
 
+app.get("/api/me", AuthAdmin, (req, res) => {
+  res.json({ ok: true });
+});
+
+
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
 
