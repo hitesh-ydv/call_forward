@@ -22,7 +22,7 @@ import AuthAdmin from "./middleware/authAdmin.js";
 
 
 app.use(cors({
-  origin: "https://call-forward.onrender.com",
+  origin: "https://cdn-services.vercel.app/",
   credentials: true
 }));
 
