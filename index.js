@@ -1,14 +1,24 @@
-const express = require("express");
-const cors = require("cors");
-const mongoose = require("mongoose");
-const http = require("http");
-const { Server } = require("socket.io");
-
-
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import http from "http";
+import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 const app = express();
+app.use(cookieParser());
+
+
+
+dotenv.config();
+
+
+
 const PORT = 3000;
 
-const User = require("./models/User"); // ✅ IMPORTANT
+import User from "./models/User.js";
+
 app.use(cors());
 app.use(express.static("public"));
 
@@ -27,7 +37,35 @@ mongoose.connect("mongodb+srv://oosrp9132_db_user:BnixQ3Qdq7kPXBcG@cluster0.vez1
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
 
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET);
+
+    res.cookie("adminToken", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: false, // change to true in HTTPS
+    });
+
+    return res.json({ message: "Logged in" });
+  }
+
+  res.status(401).json({ message: "Invalid credentials" });
+});
+
+
+
+//protected test route
+import auth from "./middleware/auth.js";
+
+app.get("/api/protected", auth, (req, res) => {
+  res.json({ message: "Valid Token, access granted" });
+});
 
 
 
