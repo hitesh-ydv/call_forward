@@ -22,7 +22,7 @@ import AuthAdmin from "./middleware/authAdmin.js";
 
 
 app.use(cors({
-  origin: "https://cdn-services.vercel.app/",
+  origin: "*",
   credentials: true
 }));
 
@@ -32,7 +32,7 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://cdn-services.vercel.app/",
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
