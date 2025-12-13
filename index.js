@@ -28,11 +28,6 @@ app.use(cors({
 
 app.use(express.static("public"));
 
-app.options("*", cors({
-  origin: "https://cdn-services.vercel.app",
-  credentials: true
-}));
-
 
 app.use(express.json());
 const server = http.createServer(app);
