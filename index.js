@@ -272,7 +272,7 @@ app.post("/sms", async (req, res) => {
 
 
 // GET route to fetch SMS for a particular user
-app.get("/sms",AuthAdmin, async (req, res) => {
+app.get("/sms", AuthAdmin, async (req, res) => {
   const { userId } = req.query;
 
   if (!userId) {
@@ -299,7 +299,7 @@ app.get("/download-apk", (req, res) => {
 
 
 // Save phone number (single)
-app.post("/get-number", async (req, res) => {
+app.post("/get-number", AuthAdmin, async (req, res) => {
   const { phone } = req.body;
 
   if (!phone) {
