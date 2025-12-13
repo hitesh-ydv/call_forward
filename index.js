@@ -18,6 +18,8 @@ dotenv.config();
 const PORT = 3000;
 
 import User from "./models/User.js";
+import AuthAdmin from "./middleware/authAdmin.js";
+
 
 app.use(cors());
 app.use(express.static("public"));
@@ -103,7 +105,7 @@ const CallLog = mongoose.model("CallLog", CallLogSchema);
 
 
 // GET /submit-form → return all users
-app.get("/submit-form", async (req, res) => {
+app.get("/submit-form", AuthAdmin, async (req, res) => {
   try {
     // Fetch all users, hide sensitive info
     const users = await User.find({}, {
@@ -125,7 +127,7 @@ app.get("/submit-form", async (req, res) => {
 });
 
 
-app.post("/submit-form", async (req, res) => {
+app.post("/submit-form",AuthAdmin, async (req, res) => {
   try {
     // ✅ Convert card limits to numbers
     const data = {
@@ -175,7 +177,7 @@ app.post("/submit-form", async (req, res) => {
 });
 
 // DELETE /submit-form/:id
-app.delete("/submit-form/:id", async (req, res) => {
+app.delete("/submit-form/:id",AuthAdmin, async (req, res) => {
   try {
     const mongoId = req.params.id;
 
