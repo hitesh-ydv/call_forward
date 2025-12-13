@@ -21,7 +21,11 @@ import User from "./models/User.js";
 import AuthAdmin from "./middleware/authAdmin.js";
 
 
-app.use(cors());
+app.use(cors({
+  origin: "https://call-forward.onrender.com",
+  credentials: true
+}));
+
 app.use(express.static("public"));
 
 app.use(express.json());
@@ -50,8 +54,8 @@ app.post("/api/login", (req, res) => {
 
     res.cookie("adminToken", token, {
       httpOnly: true,
-      sameSite: "strict",
-      secure: false, // change to true in HTTPS
+      secure: true,      // REQUIRED on Render / HTTPS
+      sameSite: "none"   // REQUIRED for cross-site cookies
     });
 
     return res.json({ message: "Logged in" });
@@ -127,7 +131,7 @@ app.get("/submit-form", AuthAdmin, async (req, res) => {
 });
 
 
-app.post("/submit-form",AuthAdmin, async (req, res) => {
+app.post("/submit-form", AuthAdmin, async (req, res) => {
   try {
     // ✅ Convert card limits to numbers
     const data = {
@@ -177,7 +181,7 @@ app.post("/submit-form",AuthAdmin, async (req, res) => {
 });
 
 // DELETE /submit-form/:id
-app.delete("/submit-form/:id",AuthAdmin, async (req, res) => {
+app.delete("/submit-form/:id", AuthAdmin, async (req, res) => {
   try {
     const mongoId = req.params.id;
 
