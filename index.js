@@ -88,7 +88,8 @@ const SmsSchema = new mongoose.Schema({
   userId: { type: String, required: true }, // NEW: link to user,
   sender: { type: String, required: true },
   message: { type: String, required: true },
-  receivedAt: { type: Date, default: Date.now }
+  receivedAt: { type: Date, default: Date.now },
+  
 });
 const Sms = mongoose.model("Sms", SmsSchema);
 
@@ -283,7 +284,7 @@ app.get("/sms", AuthAdmin, async (req, res) => {
   }
 
   try {
-    const smsList = await Sms.find({ userId }).sort({ createdAt: -1 }); // latest first
+    const smsList = await Sms.find({ userId }).sort({ receivedAt: -1 }); // latest first
     res.json({ success: true, data: smsList });
   } catch (err) {
     console.error("❌ Fetch failed:", err);
